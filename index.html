@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard Rekrutmen</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --primary: #4F46E5;
+      --primary-light: #EEF2FF;
+      --secondary: #0EA5E9;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --dark: #1E293B;
+      --muted: #64748B;
+      --border: #E2E8F0;
+      --bg: #F8FAFC;
+      --white: #FFFFFF;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--dark);
+      min-height: 100vh;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      position: fixed; top: 0; left: 0;
+      width: 240px; height: 100vh;
+      background: var(--dark);
+      display: flex; flex-direction: column;
+      padding: 0;
+      z-index: 100;
+    }
+    .sidebar-brand {
+      padding: 24px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .sidebar-brand h2 {
+      color: #fff; font-size: 18px; font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .sidebar-brand span {
+      color: var(--primary);
+    }
+    .sidebar-brand p {
+      color: var(--muted); font-size: 12px; margin-top: 3px;
+    }
+    .sidebar-nav { padding: 16px 12px; flex: 1; }
+    .nav-label {
+      color: #475569; font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 1px;
+      padding: 8px 8px 4px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 8px;
+      color: #94A3B8; font-size: 14px; font-weight: 500;
+      cursor: pointer; transition: all 0.15s;
+      margin-bottom: 2px;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+    .nav-item.active { background: var(--primary); color: #fff; }
+    .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+    .badge-count {
+      margin-left: auto; background: rgba(255,255,255,0.15);
+      color: #fff; font-size: 11px; font-weight: 600;
+      padding: 2px 7px; border-radius: 20px;
+    }
+    .nav-item.active .badge-count { background: rgba(255,255,255,0.25); }
+
+    /* MAIN */
+    .main { margin-left: 240px; min-height: 100vh; }
+
+    /* TOPBAR */
+    .topbar {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+    }
+    .topbar-left h1 { font-size: 20px; font-weight: 700; color: var(--dark); }
+    .topbar-left p { font-size: 13px; color: var(--muted); margin-top: 1px; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+      cursor: pointer; border: none; transition: all 0.15s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: #4338CA; }
+    .btn-outline {
+      background: transparent; color: var(--dark);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { background: var(--bg); }
+    .avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--primary); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+    }
+
+    /* CONTENT */
+    .content { padding: 28px 32px; }
+
+    /* STATS CARDS */
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--white); border-radius: 12px;
+      padding: 20px; border: 1px solid var(--border);
+      transition: box-shadow 0.2s;
+    }
+    .stat-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.07); }
+    .stat-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .stat-label { font-size: 13px; font-weight: 500; color: var(--muted); }
+    .stat-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+    }
+    .stat-icon.blue { background: #EEF2FF; }
+    .stat-icon.green { background: #ECFDF5; }
+    .stat-icon.yellow { background: #FFFBEB; }
+    .stat-icon.red { background: #FEF2F2; }
+    .stat-value { font-size: 28px; font-weight: 800; color: var(--dark); line-height: 1; }
+    .stat-footer { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+    .stat-change {
+      font-size: 12px; font-weight: 600; padding: 2px 6px; border-radius: 4px;
+    }
+    .stat-change.up { background: #ECFDF5; color: var(--success); }
+    .stat-change.down { background: #FEF2F2; color: var(--danger); }
+    .stat-period { font-size: 12px; color: var(--muted); }
+
+    /* CHARTS ROW */
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .card {
+      background: var(--white); border-radius: 12px;
+      border: 1px solid var(--border); padding: 20px;
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .card-title { font-size: 15px; font-weight: 700; color: var(--dark); }
+    .card-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .filter-tabs { display: flex; gap: 4px; }
+    .tab {
+      padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: none; background: transparent; color: var(--muted);
+      transition: all 0.15s;
+    }
+    .tab.active { background: var(--primary-light); color: var(--primary); }
+    .tab:hover:not(.active) { background: var(--bg); }
+
+    /* PIPELINE */
+    .pipeline-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 24px; }
+    .pipeline-card {
+      background: var(--white); border-radius: 10px;
+      border: 1px solid var(--border); padding: 16px;
+      text-align: center; transition: all 0.2s;
+    }
+    .pipeline-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.08); }
+    .pipeline-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      margin: 0 auto 10px;
+    }
+    .pipeline-num { font-size: 26px; font-weight: 800; color: var(--dark); }
+    .pipeline-label { font-size: 12px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+    .pipeline-bar {
+      height: 4px; border-radius: 2px; margin-top: 12px;
+      background: var(--border);
+    }
+    .pipeline-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
+
+    /* TABLE */
+    .table-card { background: var(--white); border-radius: 12px; border: 1px solid var(--border); }
+    .table-header {
+      padding: 18px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .search-box {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 7px 12px; width: 240px;
+    }
+    .search-box input {
+      border: none; background: transparent; font-size: 13px;
+      color: var(--dark); outline: none; width: 100%;
+    }
+    .search-box input::placeholder { color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      padding: 11px 16px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--muted); text-align: left;
+      background: var(--bg); border-bottom: 1px solid var(--border);
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #F8FAFC; }
+    td { padding: 13px 16px; font-size: 13px; }
+    .candidate-info { display: flex; align-items: center; gap: 10px; }
+    .cand-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .cand-name { font-weight: 600; color: var(--dark); font-size: 13px; }
+    .cand-email { font-size: 11px; color: var(--muted); }
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+    }
+    .badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; }
+    .badge-screening { background: #F0F9FF; color: #0369A1; }
+    .badge-screening::before { background: #0369A1; }
+    .badge-interview { background: #FFF7ED; color: #C2410C; }
+    .badge-interview::before { background: #C2410C; }
+    .badge-test { background: #FFFBEB; color: #B45309; }
+    .badge-test::before { background: #B45309; }
+    .badge-offer { background: #F0FDF4; color: #15803D; }
+    .badge-offer::before { background: #15803D; }
+    .badge-hired { background: #ECFDF5; color: #059669; }
+    .badge-hired::before { background: #059669; }
+    .badge-rejected { background: #FEF2F2; color: #DC2626; }
+    .badge-rejected::before { background: #DC2626; }
+    .source-tag {
+      display: inline-block; padding: 2px 8px;
+      border-radius: 4px; font-size: 11px; font-weight: 500;
+      background: var(--bg); color: var(--muted); border: 1px solid var(--border);
+    }
+    .action-btn {
+      padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1px solid var(--border);
+      background: transparent; color: var(--dark); transition: all 0.15s;
+    }
+    .action-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    /* SCORE */
+    .score { display: flex; align-items: center; gap: 6px; }
+    .score-bar { width: 50px; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .score-fill { height: 100%; border-radius: 3px; }
+
+    /* PAGINATION */
+    .pagination {
+      padding: 14px 20px; border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .pagination p { font-size: 13px; color: var(--muted); }
+    .page-btns { display: flex; gap: 4px; }
+    .page-btn {
+      width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--border);
+      background: transparent; font-size: 13px; cursor: pointer; transition: all 0.1s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .page-btn:hover:not(.active) { background: var(--bg); }
+
+    /* RESPONSIVE NOTE */
+    @media (max-width: 1200px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .charts-row { grid-template-columns: 1fr; }
+      .pipeline-row { grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <h2>Recruit<span>Hub</span></h2>
+    <p>Sistem Rekrutmen</p>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-label">Menu Utama</div>
+    <div class="nav-item active">
+      <span class="icon">📊</span> Dashboard
+    </div>
+    <div class="nav-item">
+      <span class="icon">👤</span> Kandidat
+      <span class="badge-count">48</span>
+    </div>
+    <div class="nav-item">
+      <span class="icon">💼</span> Lowongan
+      <span class="badge-count">12</span>
+    </div>
+    <div class="nav-item">
+      <span class="icon">📅</span> Interview
+      <span class="badge-count">7</span>
+    </div>
+    <div class="nav-label" style="margin-top:12px">Laporan</div>
+    <div class="nav-item">
+      <span class="icon">📈</span> Analitik
+    </div>
+    <div class="nav-item">
+      <span class="icon">📋</span> Laporan
+    </div>
+    <div class="nav-label" style="margin-top:12px">Pengaturan</div>
+    <div class="nav-item">
+      <span class="icon">⚙️</span> Pengaturan
+    </div>
+  </nav>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1>Dashboard Rekrutmen</h1>
+      <p>Juni 2026 · Update terakhir: hari ini</p>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-outline">⬇ Export</button>
+      <button class="btn btn-primary">＋ Tambah Kandidat</button>
+      <div class="avatar">DW</div>
+    </div>
+  </header>
+
+  <div class="content">
+
+    <!-- STATUS BAR -->
+    <div style="margin-bottom:16px;padding:10px 14px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;font-size:12px;color:#15803D;font-weight:500" id="data-status">
+      ⏳ Memuat data dari Google Sheets...
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-header">
+          <span class="stat-label">Total Pelamar</span>
+          <div class="stat-icon blue">👥</div>
+        </div>
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-footer">
+          <span class="stat-period">dari Google Sheets</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-header">
+          <span class="stat-label">Dalam Proses</span>
+          <div class="stat-icon yellow">⏳</div>
+        </div>
+        <div class="stat-value" id="stat-proses">—</div>
+        <div class="stat-footer">
+          <span class="stat-period">screening s/d penawaran</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-header">
+          <span class="stat-label">Diterima (Hired)</span>
+          <div class="stat-icon green">✅</div>
+        </div>
+        <div class="stat-value" id="stat-hired">—</div>
+        <div class="stat-footer">
+          <span class="stat-period">status hired</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-header">
+          <span class="stat-label">Ditolak</span>
+          <div class="stat-icon red">❌</div>
+        </div>
+        <div class="stat-value" id="stat-rejected">—</div>
+        <div class="stat-footer">
+          <span class="stat-period">status rejected</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIPELINE -->
+    <div class="pipeline-row">
+      <div class="pipeline-card">
+        <div class="pipeline-dot" style="background:#6366F1"></div>
+        <div class="pipeline-num" id="pipe-total">—</div>
+        <div class="pipeline-label">Melamar</div>
+        <div class="pipeline-bar"><div class="pipeline-fill" style="width:100%;background:#6366F1"></div></div>
+      </div>
+      <div class="pipeline-card">
+        <div class="pipeline-dot" style="background:#0EA5E9"></div>
+        <div class="pipeline-num" id="pipe-screening">—</div>
+        <div class="pipeline-label">Screening</div>
+        <div class="pipeline-bar"><div class="pipeline-fill" id="fill-screening" style="width:0%;background:#0EA5E9"></div></div>
+      </div>
+      <div class="pipeline-card">
+        <div class="pipeline-dot" style="background:#F59E0B"></div>
+        <div class="pipeline-num" id="pipe-interview">—</div>
+        <div class="pipeline-label">Interview</div>
+        <div class="pipeline-bar"><div class="pipeline-fill" id="fill-interview" style="width:0%;background:#F59E0B"></div></div>
+      </div>
+      <div class="pipeline-card">
+        <div class="pipeline-dot" style="background:#10B981"></div>
+        <div class="pipeline-num" id="pipe-test">—</div>
+        <div class="pipeline-label">Tes Skill</div>
+        <div class="pipeline-bar"><div class="pipeline-fill" id="fill-test" style="width:0%;background:#10B981"></div></div>
+      </div>
+      <div class="pipeline-card">
+        <div class="pipeline-dot" style="background:#8B5CF6"></div>
+        <div class="pipeline-num" id="pipe-offer">—</div>
+        <div class="pipeline-label">Penawaran</div>
+        <div class="pipeline-bar"><div class="pipeline-fill" id="fill-offer" style="width:0%;background:#8B5CF6"></div></div>
+      </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="charts-row">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Pelamar per Bulan</div>
+            <div class="card-subtitle">Tren 6 bulan terakhir</div>
+          </div>
+          <div class="filter-tabs">
+            <button class="tab active">6B</button>
+            <button class="tab">1T</button>
+            <button class="tab">YTD</button>
+          </div>
+        </div>
+        <canvas id="chartBulanan" height="160"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Pelamar per Posisi</div>
+            <div class="card-subtitle">Top 5 posisi terbanyak</div>
+          </div>
+        </div>
+        <canvas id="chartPosisi" height="160"></canvas>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-card">
+      <div class="table-header">
+        <div>
+          <div class="card-title">Daftar Kandidat Terbaru</div>
+          <div class="card-subtitle" style="margin-top:2px" id="count-kandidat">— kandidat</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div class="search-box">
+            <span>🔍</span>
+            <input type="text" placeholder="Cari kandidat..." oninput="filterTable(this.value)"/>
+          </div>
+          <button class="btn btn-outline" style="font-size:12px">⚙ Filter</button>
+        </div>
+      </div>
+      <table id="candidateTable">
+        <thead>
+          <tr>
+            <th>Kandidat</th>
+            <th>Posisi</th>
+            <th>Departemen</th>
+            <th>Status</th>
+            <th>Sumber</th>
+            <th>Skor</th>
+            <th>Tgl Lamar</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="pagination">
+        <p>Menampilkan 1–10 dari 48 kandidat</p>
+        <div class="page-btns">
+          <button class="page-btn">‹</button>
+          <button class="page-btn active">1</button>
+          <button class="page-btn">2</button>
+          <button class="page-btn">3</button>
+          <button class="page-btn">›</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ── KONFIGURASI GOOGLE SHEETS ──────────────────────────────
+  const SHEET_ID = "1VDA5uZUk_2aaWlNlp732OtKz7fnm4BQ77NqpLdDYcTk";
+  const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+
+  // Warna avatar otomatis berdasarkan index
+  const AVATAR_COLORS = ["#6366F1","#10B981","#F59E0B","#0EA5E9","#8B5CF6","#EF4444","#EC4899","#14B8A6"];
+
+  // DATA DUMMY — dipakai sebagai fallback jika sheet masih kosong
+  const DUMMY_DATA = [
+    { name:"Andi Pratama", email:"andi.p@email.com", posisi:"Frontend Developer", dept:"Engineering", status:"interview", sumber:"LinkedIn", skor:82, tgl:"10 Jun 2026" },
+    { name:"Sari Dewi", email:"sari.d@email.com", posisi:"HR Specialist", dept:"Human Resources", status:"screening", sumber:"Jobstreet", skor:74, tgl:"9 Jun 2026" },
+    { name:"Budi Santoso", email:"budi.s@email.com", posisi:"Backend Developer", dept:"Engineering", status:"offer", sumber:"Referral", skor:91, tgl:"8 Jun 2026" },
+    { name:"Rina Maharani", email:"rina.m@email.com", posisi:"Product Manager", dept:"Product", status:"hired", sumber:"LinkedIn", skor:88, tgl:"7 Jun 2026" },
+    { name:"Doni Kurniawan", email:"doni.k@email.com", posisi:"UI/UX Designer", dept:"Design", status:"test", sumber:"Glints", skor:79, tgl:"6 Jun 2026" },
+    { name:"Maya Sari", email:"maya.s@email.com", posisi:"Data Analyst", dept:"Data", status:"rejected", sumber:"Jobstreet", skor:55, tgl:"5 Jun 2026" },
+    { name:"Fajar Nugroho", email:"fajar.n@email.com", posisi:"DevOps Engineer", dept:"Engineering", status:"interview", sumber:"Referral", skor:85, tgl:"4 Jun 2026" },
+    { name:"Citra Lestari", email:"citra.l@email.com", posisi:"Marketing", dept:"Marketing", status:"screening", sumber:"LinkedIn", skor:68, tgl:"3 Jun 2026" },
+    { name:"Hendra Wijaya", email:"hendra.w@email.com", posisi:"Accountant", dept:"Finance", status:"hired", sumber:"Kalibrr", skor:92, tgl:"2 Jun 2026" },
+    { name:"Putri Amalia", email:"putri.a@email.com", posisi:"Frontend Developer", dept:"Engineering", status:"test", sumber:"Glints", skor:77, tgl:"1 Jun 2026" },
+  ];
+
+  let candidates = [];
+
+  // ── FETCH DATA DARI GOOGLE SHEETS (JSONP — bebas CORS) ────
+  function loadFromSheets() {
+    const statusEl = document.getElementById("data-status");
+    const callbackName = "gvizCallback_" + Date.now();
+
+    // Buat script tag JSONP
+    const script = document.createElement("script");
+    script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&callback=${callbackName}`;
+
+    window[callbackName] = function(json) {
+      // Bersihkan
+      delete window[callbackName];
+      document.head.removeChild(script);
+
+      const rows = json.table.rows;
+      if (!rows || rows.length === 0) {
+        candidates = DUMMY_DATA.map((d, i) => ({ ...d, color: AVATAR_COLORS[i % AVATAR_COLORS.length] }));
+        if (statusEl) { statusEl.textContent = "⚠ Sheet kosong — menampilkan data contoh"; statusEl.style.background="#FFFBEB"; statusEl.style.borderColor="#FDE68A"; statusEl.style.color="#B45309"; }
+      } else {
+        candidates = rows.map((row, i) => {
+          const c = row.c;
+          const get = (idx) => (c[idx] && c[idx].v != null) ? String(c[idx].v) : "";
+          return {
+            name:   get(0),
+            email:  get(1),
+            posisi: get(2),
+            dept:   get(3),
+            status: get(4).toLowerCase().trim(),
+            sumber: get(5),
+            skor:   parseInt(get(6)) || 0,
+            tgl:    get(7),
+            color:  AVATAR_COLORS[i % AVATAR_COLORS.length],
+          };
+        }).filter(c => c.name);
+        if (statusEl) { statusEl.textContent = `✅ Data live dari Google Sheets · ${candidates.length} kandidat`; }
+      }
+      updateStats();
+      renderTable(candidates);
+      renderCharts();
+    };
+
+    // Timeout 6 detik — fallback ke data dummy
+    const timer = setTimeout(function() {
+      if (window[callbackName]) {
+        delete window[callbackName];
+        try { document.head.removeChild(script); } catch(e) {}
+        candidates = DUMMY_DATA.map((d, i) => ({ ...d, color: AVATAR_COLORS[i % AVATAR_COLORS.length] }));
+        if (statusEl) { statusEl.textContent = "⚠ Sheet belum dipublish atau timeout — menampilkan data contoh"; statusEl.style.background="#FFFBEB"; statusEl.style.borderColor="#FDE68A"; statusEl.style.color="#B45309"; }
+        updateStats(); renderTable(candidates); renderCharts();
+      }
+    }, 6000);
+
+    const origCallback = window[callbackName];
+    window[callbackName] = function(json) { clearTimeout(timer); origCallback(json); };
+
+    script.onerror = function() { clearTimeout(timer);
+      delete window[callbackName];
+      candidates = DUMMY_DATA.map((d, i) => ({ ...d, color: AVATAR_COLORS[i % AVATAR_COLORS.length] }));
+      if (statusEl) { statusEl.textContent = "⚠ Gagal memuat sheet — menampilkan data contoh"; statusEl.style.background="#FFFBEB"; statusEl.style.borderColor="#FDE68A"; statusEl.style.color="#B45309"; }
+      updateStats();
+      renderTable(candidates);
+      renderCharts();
+    };
+
+    document.head.appendChild(script);
+  }
+
+  // ── UPDATE STAT CARDS ──────────────────────────────────────
+  function updateStats() {
+    const total    = candidates.length;
+    const proses   = candidates.filter(c => ["screening","interview","test","offer"].includes(c.status)).length;
+    const hired    = candidates.filter(c => c.status === "hired").length;
+    const rejected = candidates.filter(c => c.status === "rejected").length;
+    document.getElementById("stat-total").textContent    = total;
+    document.getElementById("stat-proses").textContent   = proses;
+    document.getElementById("stat-hired").textContent    = hired;
+    document.getElementById("stat-rejected").textContent = rejected;
+    document.getElementById("count-kandidat").textContent = total;
+
+    // Pipeline
+    const screening = candidates.filter(c => c.status === "screening").length;
+    const interview = candidates.filter(c => c.status === "interview").length;
+    const test      = candidates.filter(c => c.status === "test").length;
+    const offer     = candidates.filter(c => c.status === "offer").length;
+    document.getElementById("pipe-total").textContent    = total;
+    document.getElementById("pipe-screening").textContent = screening;
+    document.getElementById("pipe-interview").textContent = interview;
+    document.getElementById("pipe-test").textContent     = test;
+    document.getElementById("pipe-offer").textContent    = offer;
+    if (total > 0) {
+      document.getElementById("fill-screening").style.width = (screening/total*100) + "%";
+      document.getElementById("fill-interview").style.width = (interview/total*100) + "%";
+      document.getElementById("fill-test").style.width      = (test/total*100) + "%";
+      document.getElementById("fill-offer").style.width     = (offer/total*100) + "%";
+    }
+  }
+
+  let chartBulanan, chartPosisi;
+
+  const statusMap = {
+    screening: { label:"Screening", cls:"badge-screening" },
+    interview:  { label:"Interview", cls:"badge-interview" },
+    test:       { label:"Tes Skill", cls:"badge-test" },
+    offer:      { label:"Penawaran", cls:"badge-offer" },
+    hired:      { label:"Diterima", cls:"badge-hired" },
+    rejected:   { label:"Ditolak",  cls:"badge-rejected" },
+  };
+
+  const scoreColor = s => s >= 80 ? "#10B981" : s >= 65 ? "#F59E0B" : "#EF4444";
+
+  function renderTable(data) {
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML = data.map(c => {
+      const st = statusMap[c.status];
+      const sc = scoreColor(c.skor);
+      const initials = c.name.split(" ").map(w=>w[0]).join("").slice(0,2);
+      return `<tr>
+        <td>
+          <div class="candidate-info">
+            <div class="cand-avatar" style="background:${c.color}">${initials}</div>
+            <div>
+              <div class="cand-name">${c.name}</div>
+              <div class="cand-email">${c.email}</div>
+            </div>
+          </div>
+        </td>
+        <td style="font-weight:500">${c.posisi}</td>
+        <td style="color:var(--muted)">${c.dept}</td>
+        <td><span class="badge ${st.cls}">${st.label}</span></td>
+        <td><span class="source-tag">${c.sumber}</span></td>
+        <td>
+          <div class="score">
+            <span style="font-size:12px;font-weight:700;color:${sc}">${c.skor}</span>
+            <div class="score-bar"><div class="score-fill" style="width:${c.skor}%;background:${sc}"></div></div>
+          </div>
+        </td>
+        <td style="color:var(--muted);font-size:12px">${c.tgl}</td>
+        <td><button class="action-btn">Detail</button></td>
+      </tr>`;
+    }).join("");
+  }
+
+  function filterTable(q) {
+    const filtered = candidates.filter(c =>
+      c.name.toLowerCase().includes(q.toLowerCase()) ||
+      c.posisi.toLowerCase().includes(q.toLowerCase()) ||
+      c.dept.toLowerCase().includes(q.toLowerCase())
+    );
+    renderTable(filtered);
+  }
+
+  // CHART RENDER (dipanggil setelah data loaded)
+  function renderCharts() {
+    // Hitung per posisi
+    const posisiCount = {};
+    candidates.forEach(c => { posisiCount[c.posisi] = (posisiCount[c.posisi] || 0) + 1; });
+    const topPosisi = Object.entries(posisiCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+    // Hitung per status untuk bar chart
+    const statusLabels = ["screening","interview","test","offer","hired","rejected"];
+    const statusData   = statusLabels.map(s => candidates.filter(c=>c.status===s).length);
+
+    if (chartBulanan) chartBulanan.destroy();
+    if (chartPosisi)  chartPosisi.destroy();
+
+    chartBulanan = new Chart(document.getElementById("chartBulanan"), {
+      type: "bar",
+      data: {
+        labels: statusLabels.map(s => s.charAt(0).toUpperCase()+s.slice(1)),
+        datasets: [{
+          label:"Kandidat", data: statusData,
+          backgroundColor: ["#0EA5E9","#F59E0B","#F59E0B","#10B981","#4F46E5","#EF4444"],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive:true,
+        plugins:{ legend:{ display:false } },
+        scales:{ x:{ grid:{display:false} }, y:{ grid:{color:"#F1F5F9"}, ticks:{font:{size:11}} } }
+      }
+    });
+
+    chartPosisi = new Chart(document.getElementById("chartPosisi"), {
+      type: "doughnut",
+      data: {
+        labels: topPosisi.map(p=>p[0]),
+        datasets:[{
+          data: topPosisi.map(p=>p[1]),
+          backgroundColor:["#4F46E5","#0EA5E9","#10B981","#F59E0B","#8B5CF6"],
+          borderWidth:0, hoverOffset:4
+        }]
+      },
+      options: {
+        responsive:true, cutout:"70%",
+        plugins:{ legend:{ position:"right", labels:{ boxWidth:10, font:{size:11}, padding:14 } } }
+      }
+    });
+  }
+
+  // ── INISIALISASI ───────────────────────────────────────────
+  loadFromSheets();
+
+  // Tab interaktif
+  document.querySelectorAll(".tab").forEach(t => {
+    t.addEventListener("click", function() {
+      this.closest(".filter-tabs").querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+      this.classList.add("active");
+    });
+  });
+
+  // Nav interaktif
+  document.querySelectorAll(".nav-item").forEach(n => {
+    n.addEventListener("click", function() {
+      document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
+      this.classList.add("active");
+    });
+  });
+</script>
+</body>
+</html>
