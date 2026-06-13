@@ -706,6 +706,7 @@
   ];
 
   let candidates = [];
+  let displayCandidates = []; // kandidat 30 hari terakhir
   let filteredCandidates = [];
   let currentPage = 1;
   const PAGE_SIZE = 10;
@@ -769,7 +770,9 @@
       }).filter(c => c.name);
 
       if (statusEl) { statusEl.textContent = `✅ Data live dari Google Sheets · ${candidates.length} kandidat`; statusEl.style.background="#F0FDF4"; statusEl.style.borderColor="#BBF7D0"; statusEl.style.color="#15803D"; }
-      updateStats(); renderTable(candidates); renderCharts();
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+      displayCandidates = candidates.filter(c => c.dateObj && c.dateObj >= cutoff);
+      updateStats(); renderTable(displayCandidates); renderCharts();
     } catch(e) {
       if (statusEl) { statusEl.textContent = "⚠ Gagal memuat data dari Google Sheets"; statusEl.style.background="#FEF2F2"; statusEl.style.borderColor="#FCA5A5"; statusEl.style.color="#B91C1C"; }
       console.error(e);
@@ -819,7 +822,7 @@
     filteredCandidates = data;
     currentPage = 1;
     const countEl = document.getElementById("count-kandidat");
-    if (countEl) countEl.textContent = `${data.length} kandidat`;
+    if (countEl) countEl.textContent = `${data.length} kandidat (30 hari terakhir)`;
     renderPage();
   }
 
@@ -887,7 +890,8 @@
   }
 
   function filterTable(q) {
-    const filtered = candidates.filter(c =>
+    const src = q ? candidates : displayCandidates;
+    const filtered = src.filter(c =>
       c.name.toLowerCase().includes(q.toLowerCase()) ||
       c.posisi.toLowerCase().includes(q.toLowerCase()) ||
       c.dept.toLowerCase().includes(q.toLowerCase())
