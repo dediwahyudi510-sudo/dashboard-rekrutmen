@@ -794,8 +794,7 @@
       }).filter(c => c.name);
 
       if (statusEl) { statusEl.textContent = `✅ Data live dari Google Sheets · ${candidates.length} kandidat`; statusEl.style.background="#F0FDF4"; statusEl.style.borderColor="#BBF7D0"; statusEl.style.color="#15803D"; }
-      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
-      displayCandidates = candidates.filter(c => c.dateObj && c.dateObj >= cutoff);
+      displayCandidates = [...candidates];
       const badgeEl = document.getElementById("badge-kandidat");
       if (badgeEl) badgeEl.textContent = candidates.length;
       updateStats(); renderTable(displayCandidates); renderCharts();
@@ -849,7 +848,7 @@
     filteredCandidates = data;
     currentPage = 1;
     const countEl = document.getElementById("count-kandidat");
-    if (countEl) countEl.textContent = `${data.length} kandidat (30 hari terakhir)`;
+    if (countEl) countEl.textContent = `${data.length} kandidat`;
     renderPage();
   }
 
