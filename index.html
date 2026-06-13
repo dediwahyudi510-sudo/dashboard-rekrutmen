@@ -598,14 +598,8 @@
         <tbody id="tableBody"></tbody>
       </table>
       <div class="pagination">
-        <p>Menampilkan 1–10 dari 48 kandidat</p>
-        <div class="page-btns">
-          <button class="page-btn">‹</button>
-          <button class="page-btn active">1</button>
-          <button class="page-btn">2</button>
-          <button class="page-btn">3</button>
-          <button class="page-btn">›</button>
-        </div>
+        <p id="pagination-info">Menampilkan —</p>
+        <div class="page-btns" id="page-btns"></div>
       </div>
     </div>
 
@@ -712,16 +706,28 @@
   ];
 
   let candidates = [];
+  let filteredCandidates = [];
+  let currentPage = 1;
+  const PAGE_SIZE = 25;
 
   // ── FETCH DATA DARI GOOGLE SHEETS ─────────────────────────
   async function loadFromSheets() {
     const statusEl = document.getElementById("data-status");
 
     function parseTgl(val) {
-      if (!val) return { dateObj: null, label: "-" };
-      const d = new Date(val);
+      if (!val || String(val).trim() === "") return { dateObj: null, label: "-" };
+      const str = String(val).trim();
+      // Format DD/MM/YYYY atau DD-MM-YYYY (format Indonesia)
+      const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (dmy) {
+        const d = new Date(+dmy[3], +dmy[2]-1, +dmy[1]);
+        if (!isNaN(d)) return { dateObj: d, label: d.toLocaleDateString("id-ID", { day:"2-digit", month:"short", year:"numeric" }) };
+      }
+      // Format YYYY-MM-DD atau format standar lainnya
+      const d = new Date(str);
       if (!isNaN(d)) return { dateObj: d, label: d.toLocaleDateString("id-ID", { day:"2-digit", month:"short", year:"numeric" }) };
-      return { dateObj: null, label: String(val) };
+      // Tampilkan nilai asli jika tidak bisa di-parse
+      return { dateObj: null, label: str };
     }
 
     try {
@@ -803,13 +809,21 @@
   };
 
   function renderTable(data) {
-    // Filter 30 hari terakhir — hanya untuk tabel kandidat terbaru
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
-    data = data.filter(c => !c.dateObj || c.dateObj >= cutoff);
+    filteredCandidates = data;
+    currentPage = 1;
     const countEl = document.getElementById("count-kandidat");
-    if (countEl) countEl.textContent = `${data.length} kandidat (30 hari terakhir)`;
+    if (countEl) countEl.textContent = `${data.length} kandidat`;
+    renderPage();
+  }
+
+  function renderPage() {
+    const total    = filteredCandidates.length;
+    const start    = (currentPage - 1) * PAGE_SIZE;
+    const end      = Math.min(start + PAGE_SIZE, total);
+    const pageData = filteredCandidates.slice(start, end);
+
     const tbody = document.getElementById("tableBody");
-    tbody.innerHTML = data.map(c => {
+    tbody.innerHTML = pageData.map(c => {
       const st = statusMap[c.status] || { label: c.status, cls: "badge-screening" };
       const initials = c.name.split(" ").map(w=>w[0]).join("").slice(0,2);
       const avatarHtml = c.foto
@@ -834,6 +848,35 @@
         <td><button class="action-btn" onclick="showDetail('${c.id || c.name}')">Detail</button></td>
       </tr>`;
     }).join("");
+
+    // Pagination info
+    const infoEl = document.getElementById("pagination-info");
+    if (infoEl) infoEl.textContent = total === 0
+      ? "Tidak ada kandidat"
+      : `Menampilkan ${start+1}–${end} dari ${total} kandidat`;
+
+    // Pagination buttons
+    const totalPages = Math.ceil(total / PAGE_SIZE);
+    const btnsEl = document.getElementById("page-btns");
+    if (!btnsEl) return;
+    let html = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?"disabled":""} style="${currentPage===1?"opacity:.4;cursor:default":""}">‹</button>`;
+    const rangeStart = Math.max(1, currentPage - 2);
+    const rangeEnd   = Math.min(totalPages, currentPage + 2);
+    if (rangeStart > 1)          html += `<button class="page-btn" onclick="goPage(1)">1</button>${rangeStart>2?'<span style="padding:0 4px;color:var(--muted)">…</span>':""}`;
+    for (let p = rangeStart; p <= rangeEnd; p++) {
+      html += `<button class="page-btn ${p===currentPage?"active":""}" onclick="goPage(${p})">${p}</button>`;
+    }
+    if (rangeEnd < totalPages)   html += `${rangeEnd<totalPages-1?'<span style="padding:0 4px;color:var(--muted)">…</span>':""}<button class="page-btn" onclick="goPage(${totalPages})">${totalPages}</button>`;
+    html += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages||totalPages===0?"disabled":""} style="${currentPage===totalPages||totalPages===0?"opacity:.4;cursor:default":""}">›</button>`;
+    btnsEl.innerHTML = html;
+  }
+
+  function goPage(p) {
+    const totalPages = Math.ceil(filteredCandidates.length / PAGE_SIZE);
+    if (p < 1 || p > totalPages) return;
+    currentPage = p;
+    renderPage();
+    document.getElementById("candidateTable").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function filterTable(q) {
