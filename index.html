@@ -634,52 +634,16 @@
   let currentUser = null;
 
   async function doLogin() {
-    const email    = document.getElementById("login-email").value.trim().toLowerCase();
-    const password = document.getElementById("login-password").value;
-    const errEl    = document.getElementById("login-error");
-    const loadEl   = document.getElementById("login-loading");
-
-    errEl.classList.remove("show");
-    if (!email || !password) { errEl.textContent = "Email dan password wajib diisi."; errEl.classList.add("show"); return; }
-
-    loadEl.classList.add("show");
-
-    try {
-      const res  = await fetch(GVIZ("users"));
-      const text = await res.text();
-      const rows = parseCSV(text);
-      loadEl.classList.remove("show");
-
-      const match = rows.find(r =>
-        (r.email || "").trim().toLowerCase() === email &&
-        String(r.password || "").trim() === String(password).trim()
-      );
-
-      if (match) {
-        currentUser = { email: match.email, nama: match.nama_user, role: match.role };
-        document.getElementById("login-page").classList.add("hidden");
-        const initials = match.nama_user.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
-        document.getElementById("user-avatar").textContent = initials;
-        document.getElementById("user-name").textContent   = match.nama_user;
-        loadFromSheets();
-      } else {
-        errEl.textContent = "Email atau password salah.";
-        errEl.classList.add("show");
-      }
-    } catch(e) {
-      loadEl.classList.remove("show");
-      errEl.textContent = "Gagal memuat data. Cek koneksi internet.";
-      errEl.classList.add("show");
-    }
+    // LOGIN DINONAKTIFKAN SEMENTARA — langsung masuk
+    document.getElementById("login-page").classList.add("hidden");
+    document.getElementById("user-avatar").textContent = "DW";
+    document.getElementById("user-name").textContent   = "Dedi Wahyudi";
+    loadFromSheets();
   }
 
   function doLogout() {
-    currentUser = null;
-    document.getElementById("login-page").classList.remove("hidden");
-    document.getElementById("login-email").value    = "";
-    document.getElementById("login-password").value = "";
-    document.getElementById("user-name").textContent = "";
-    document.getElementById("user-avatar").textContent = "?";
+    // LOGOUT DINONAKTIFKAN SEMENTARA — reload halaman
+    location.reload();
   }
 
   // ── KONFIGURASI GOOGLE SHEETS ──────────────────────────────
