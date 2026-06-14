@@ -1775,47 +1775,116 @@
       container.innerHTML = `<div style="color:var(--muted);padding:20px 0">Belum ada data penempatan.</div>`;
       return;
     }
+
+    // ── Buat rekap per (pt, departemen, bagian, jabatan) x bulan ──
+    const BULAN_ID = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+    const rekapMap = {};
+    const bulanSet = new Set();
+    data.forEach(f => {
+      const key = [f.pt||"-", f.departemen||f.dep||"-", f.bagian||"-", f.jabatan||"-"].join("|||");
+      if (!rekapMap[key]) rekapMap[key] = { pt:f.pt||"-", dep:f.departemen||f.dep||"-", bagian:f.bagian||"-", jabatan:f.jabatan||"-", bulan:{} };
+      const {dateObj} = parseTgl(f.tgl_gabung||"");
+      if (dateObj) {
+        const bKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth()).padStart(2,"0")}`;
+        bulanSet.add(bKey);
+        rekapMap[key].bulan[bKey] = (rekapMap[key].bulan[bKey]||0) + 1;
+      }
+    });
+    const bulanCols = [...bulanSet].sort().map(k => {
+      const [y, m] = k.split("-");
+      return { key: k, label: `${BULAN_ID[+m]} ${y}` };
+    });
+    const rekapRows = Object.values(rekapMap).sort((a,b) => a.pt.localeCompare(b.pt) || a.dep.localeCompare(b.dep));
+
     container.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <!-- REKAP PENEMPATAN PER BULAN -->
+      <div style="margin-bottom:24px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div>
+            <h2 style="font-size:18px;font-weight:700;color:var(--dark)">Rekap Penempatan per Bulan</h2>
+            <p style="font-size:13px;color:var(--muted);margin-top:2px">${rekapRows.length} jabatan · ${data.length} karyawan ditempatkan</p>
+          </div>
+          <button onclick="loadPenempatan()" style="padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--dark);cursor:pointer;font-size:13px">🔄 Refresh</button>
+        </div>
+        <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border)">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="background:var(--bg)">
+                <th style="padding:10px 14px;text-align:left;font-weight:700;color:var(--muted);text-transform:uppercase;font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap">PT</th>
+                <th style="padding:10px 14px;text-align:left;font-weight:700;color:var(--muted);text-transform:uppercase;font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap">Departemen</th>
+                <th style="padding:10px 14px;text-align:left;font-weight:700;color:var(--muted);text-transform:uppercase;font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap">Bagian</th>
+                <th style="padding:10px 14px;text-align:left;font-weight:700;color:var(--muted);text-transform:uppercase;font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap">Jabatan</th>
+                ${bulanCols.map(b=>`<th style="padding:10px 12px;text-align:center;font-weight:700;color:var(--muted);text-transform:uppercase;font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap;min-width:70px">${b.label}</th>`).join("")}
+                <th style="padding:10px 12px;text-align:center;font-weight:700;color:var(--dark);text-transform:uppercase;font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap;background:#EEF2FF">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rekapRows.map(r => {
+                const total = Object.values(r.bulan).reduce((s,v)=>s+v,0);
+                return `<tr style="border-bottom:1px solid var(--border)">
+                  <td style="padding:10px 14px;font-weight:600;color:var(--primary)">${r.pt}</td>
+                  <td style="padding:10px 14px;font-weight:500">${r.dep}</td>
+                  <td style="padding:10px 14px;color:var(--muted)">${r.bagian}</td>
+                  <td style="padding:10px 14px">${r.jabatan}</td>
+                  ${bulanCols.map(b=>{
+                    const n = r.bulan[b.key]||0;
+                    return `<td style="padding:10px 12px;text-align:center;font-weight:${n?'700':'400'};color:${n?'var(--dark)':'var(--border)'}">${n||"-"}</td>`;
+                  }).join("")}
+                  <td style="padding:10px 12px;text-align:center;font-weight:800;color:var(--primary);background:#EEF2FF">${total}</td>
+                </tr>`;
+              }).join("")}
+              <!-- TOTAL ROW -->
+              <tr style="background:var(--bg);font-weight:800">
+                <td colspan="4" style="padding:10px 14px;font-weight:800;color:var(--dark)">TOTAL</td>
+                ${bulanCols.map(b=>{
+                  const tot = rekapRows.reduce((s,r)=>s+(r.bulan[b.key]||0),0);
+                  return `<td style="padding:10px 12px;text-align:center;font-weight:800;color:var(--dark)">${tot||"-"}</td>`;
+                }).join("")}
+                <td style="padding:10px 12px;text-align:center;font-weight:800;color:var(--primary);background:#EEF2FF">${data.length}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- DATA DETAIL PENEMPATAN -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div>
           <h2 style="font-size:18px;font-weight:700;color:var(--dark)">Data Penempatan</h2>
           <p id="penempatan-count" style="font-size:13px;color:var(--muted);margin-top:2px">${data.length} karyawan ditempatkan</p>
         </div>
-        <div style="display:flex;gap:10px;align-items:center">
-          <div class="search-box" style="width:260px">
-            <span>🔍</span>
-            <input type="text" placeholder="Cari nama, jabatan, bagian, departemen..."
-              oninput="filterPenempatan(this.value)"
-              style="border:none;background:transparent;font-size:13px;color:var(--dark);outline:none;width:100%"/>
-          </div>
-          <button onclick="loadPenempatan()" style="padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--dark);cursor:pointer;font-size:13px">🔄 Refresh</button>
+        <div class="search-box" style="width:280px">
+          <span>🔍</span>
+          <input type="text" placeholder="Cari nama, jabatan, bagian, departemen..."
+            oninput="filterPenempatan(this.value)"
+            style="border:none;background:transparent;font-size:13px;color:var(--dark);outline:none;width:100%"/>
         </div>
       </div>
       <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border)">
         <table style="width:100%;border-collapse:collapse;font-size:13px">
           <thead>
-            <tr style="background:var(--sidebar);border-bottom:1px solid var(--border)">
-              <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--text)">Nama</th>
-              <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--text)">No. Permintaan</th>
-              <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--text)">PT</th>
-              <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--text)">Departemen</th>
-              <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--text)">Bagian</th>
-              <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--text)">Jabatan</th>
-              <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--text)">Tgl Gabung</th>
-              <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--text)">Alasan</th>
+            <tr style="background:var(--bg);border-bottom:1px solid var(--border)">
+              <th style="padding:11px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Nama</th>
+              <th style="padding:11px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">No. Permintaan</th>
+              <th style="padding:11px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">PT</th>
+              <th style="padding:11px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Departemen</th>
+              <th style="padding:11px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Bagian</th>
+              <th style="padding:11px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Jabatan</th>
+              <th style="padding:11px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Tgl Gabung</th>
+              <th style="padding:11px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Alasan</th>
             </tr>
           </thead>
           <tbody id="penempatan-tbody">
             ${data.map(f => `
-              <tr>
-                <td>${f.nama || "-"}</td>
-                <td style="font-size:12px;color:var(--muted)">${f.nomor_permintaan || "-"}</td>
-                <td><span style="font-weight:600;color:var(--primary)">${f.pt || "-"}</span></td>
-                <td>${f.departemen || f.dep || "-"}</td>
-                <td>${f.bagian || "-"}</td>
-                <td>${f.jabatan || "-"}</td>
-                <td style="white-space:nowrap">${f.tgl_gabung || "-"}</td>
-                <td><span class="badge badge-screening">${f.alasan || "-"}</span></td>
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:13px 14px">${f.nama || "-"}</td>
+                <td style="padding:13px 14px;font-size:12px;color:var(--muted)">${f.nomor_permintaan || "-"}</td>
+                <td style="padding:13px 14px"><span style="font-weight:600;color:var(--primary)">${f.pt || "-"}</span></td>
+                <td style="padding:13px 14px">${f.departemen || f.dep || "-"}</td>
+                <td style="padding:13px 14px">${f.bagian || "-"}</td>
+                <td style="padding:13px 14px">${f.jabatan || "-"}</td>
+                <td style="padding:13px 14px;white-space:nowrap">${f.tgl_gabung || "-"}</td>
+                <td style="padding:13px 14px"><span class="badge badge-screening">${f.alasan || "-"}</span></td>
               </tr>`).join("")}
           </tbody>
         </table>
