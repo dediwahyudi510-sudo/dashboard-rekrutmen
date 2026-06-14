@@ -269,7 +269,10 @@
 
     /* DETAIL VIEW */
     .detail-view {
-      display: none; padding: 28px 32px;
+      display: none;
+      position: fixed; top: 0; left: 240px; right: 0; bottom: 0;
+      background: var(--bg); overflow-y: auto;
+      padding: 28px 32px; z-index: 200;
     }
     .back-btn {
       display: inline-flex; align-items: center; gap: 8px;
@@ -1593,19 +1596,12 @@
         </div>
       </div>`;
 
-    document.querySelectorAll(".content").forEach(el => el.style.display = "none");
     document.getElementById("detail-view").style.display = "block";
-    window.scrollTo({ top: 0, behavior: "instant" });
+    document.getElementById("detail-view").scrollTop = 0;
   }
 
   function hideDetail() {
     document.getElementById("detail-view").style.display = "none";
-    const activeNav = document.querySelector(".nav-item.active[data-page]");
-    const activePage = activeNav ? activeNav.dataset.page : "kandidat";
-    ["dashboard","kandidat","lowongan","interview"].forEach(p => {
-      const el = document.getElementById(`page-${p}`);
-      if (el) el.style.display = p === activePage ? "block" : "none";
-    });
   }
 </script>
 
