@@ -778,6 +778,9 @@
           jurusan:     r.jurusan || "",
           no_telp:     r.no_telp || "",
           kabupaten:   r.kabupaten || "",
+          kecamatan:   r.kecamatan || "",
+          desa:        r.desa || "",
+          tgl_lahir:   r.tgl_lahir || r.tanggal_lahir || "",
           pengalaman:  r.pengalaman || "",
           foto:             r.foto || "",
           status_kandidat:  r.status_kandidat || "",
@@ -1546,36 +1549,18 @@
         <div class="table-header">
           <div>
             <div class="card-title">Rekap Kebutuhan Karyawan</div>
-            <div class="card-subtitle">Data dari sheet recap_jobs · ${recapJobs.length} posisi</div>
+            <div class="card-subtitle" id="recap-subtitle">Data dari sheet recap_jobs · ${recapJobs.length} posisi</div>
           </div>
-          <button onclick="loadRecapJobs()" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--dark);cursor:pointer;font-size:12px">🔄 Refresh</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="recap-filter-dept" onchange="filterRecapJobs()"
+              style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--dark);background:var(--bg);cursor:pointer">
+              <option value="">Semua Departemen</option>
+              ${[...new Set(recapJobs.map(r=>r.departemen||"-").filter(Boolean))].sort().map(d=>`<option value="${d}">${d}</option>`).join("")}
+            </select>
+            <button onclick="loadRecapJobs()" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--dark);cursor:pointer;font-size:12px">🔄 Refresh</button>
+          </div>
         </div>
-        <table>
-          <thead><tr>
-            <th>Departemen</th><th>Jabatan</th>
-            <th style="text-align:center">Kebutuhan</th>
-            <th style="text-align:center">Terpenuhi</th>
-            <th style="text-align:center;color:var(--danger)">Kekurangan</th>
-            <th style="min-width:220px">Kondisi Sebelum</th>
-            <th style="min-width:220px">Kondisi Saat Ini</th>
-          </tr></thead>
-          <tbody>
-            ${recapJobs.map(r => {
-              const butuh  = parseInt(r.kebutuhan)   || 0;
-              const terisi = parseInt(r.terpenuhi)   || 0;
-              const kurang = parseInt(r.kekurangan)  || (butuh - terisi);
-              return `<tr>
-                <td style="font-weight:600">${r.departemen || "-"}</td>
-                <td>${r.jabatan || "-"}</td>
-                <td style="text-align:center;font-weight:700">${butuh}</td>
-                <td style="text-align:center;color:var(--success);font-weight:600">${terisi}</td>
-                <td style="text-align:center;color:var(--danger);font-weight:700">${kurang}</td>
-                <td style="font-size:12px;color:var(--muted)">${r.kondisi_sebelum || "-"}</td>
-                <td style="font-size:12px;color:var(--muted)">${r.kondisi_saat_ini || "-"}</td>
-              </tr>`;
-            }).join("")}
-          </tbody>
-        </table>
+        <div id="recap-jobs-wrap"></div>
       </div>` : ""}
 
       <!-- TABEL DEPARTEMEN -->
@@ -1638,18 +1623,28 @@
     const initials = c.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
     const st = statusMap[c.status] || { label: c.status, cls: "badge-screening" };
 
+    const field = (label, val) => `
+      <div class="profile-field">
+        <label>${label}</label>
+        <span${!val||val==="-"?' style="color:var(--muted)"':''}>${val||"-"}</span>
+      </div>`;
+
+    const section = (title) => `
+      <div style="grid-column:1/-1;margin-top:20px;padding-bottom:6px;border-bottom:2px solid var(--border)">
+        <span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--primary)">${title}</span>
+      </div>`;
+
+    const avatarHtml = c.foto
+      ? `<img src="${c.foto}" alt="${c.name}" style="width:88px;height:88px;border-radius:8px;object-fit:cover;border:4px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,.12)">`
+      : `<div style="width:88px;height:88px;border-radius:8px;background:${c.color};color:#fff;font-size:28px;font-weight:800;display:flex;align-items:center;justify-content:center;border:4px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,.12)">${initials}</div>`;
+
     document.getElementById("detail-view").innerHTML = `
       <button class="back-btn" onclick="hideDetail()">← Close</button>
       <div class="profile-card">
         <div class="profile-banner"></div>
         <div class="profile-body">
           <div class="profile-avatar-wrap">
-            <div>
-              ${c.foto
-                ? `<img src="${c.foto}" alt="${c.name}" class="profile-avatar-large" style="background:${c.color}">`
-                : `<div class="profile-avatar-large" style="background:${c.color}">${initials}</div>`
-              }
-            </div>
+            <div style="margin-top:-44px">${avatarHtml}</div>
             <span class="badge ${st.cls}" style="margin-bottom:8px;font-size:13px;padding:5px 14px">${st.label}</span>
           </div>
           <div class="profile-name">${c.name}</div>
@@ -1657,38 +1652,25 @@
           ${c.id ? `<span class="profile-id">${c.id}</span>` : ""}
 
           <div class="profile-grid">
-            <div class="profile-field">
-              <label>Posisi</label>
-              <span>${c.posisi || "-"}</span>
-            </div>
-            <div class="profile-field">
-              <label>Departemen</label>
-              <span>${c.dept || "-"}</span>
-            </div>
-            <div class="profile-field">
-              <label>Pendidikan</label>
-              <span>${c.pendidikan || "-"}${c.jurusan ? " · " + c.jurusan : ""}</span>
-            </div>
-            <div class="profile-field">
-              <label>No. Telepon</label>
-              <span>${c.no_telp || "-"}</span>
-            </div>
-            <div class="profile-field">
-              <label>Kabupaten</label>
-              <span>${c.kabupaten || "-"}</span>
-            </div>
-            <div class="profile-field">
-              <label>Pengalaman</label>
-              <span>${c.pengalaman || "-"}</span>
-            </div>
-            <div class="profile-field">
-              <label>Gender</label>
-              <span>${c.gender || "-"}</span>
-            </div>
-            <div class="profile-field">
-              <label>Tanggal Daftar</label>
-              <span>${c.tgl || "-"}</span>
-            </div>
+            ${section("Informasi Rekrutmen")}
+            ${field("Posisi", c.posisi)}
+            ${field("Departemen", c.dept)}
+            ${field("No. Telepon", c.no_telp)}
+            ${field("Tanggal Lamaran Diterima", c.tgl)}
+
+            ${section("Latar Belakang Pendidikan")}
+            ${field("Pendidikan", c.pendidikan)}
+            ${field("Jurusan", c.jurusan)}
+            ${field("Pengalaman", c.pengalaman)}
+
+            ${section("Data Pribadi")}
+            ${field("Gender", c.gender)}
+            ${field("Tgl Lahir", c.tgl_lahir)}
+
+            ${section("Alamat")}
+            ${field("Kabupaten", c.kabupaten)}
+            ${field("Kecamatan", c.kecamatan)}
+            ${field("Desa", c.desa)}
           </div>
         </div>
       </div>`;
