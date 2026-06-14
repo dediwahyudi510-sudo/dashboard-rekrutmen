@@ -1208,7 +1208,11 @@
   }
 
   // ── INISIALISASI ───────────────────────────────────────────
-  // loadFromSheets() dipanggil setelah login berhasil (via doLogin)
+  // LOGIN DINONAKTIFKAN SEMENTARA — langsung masuk tanpa form
+  document.getElementById("login-page").classList.add("hidden");
+  document.getElementById("user-avatar").textContent = "DW";
+  document.getElementById("user-name").textContent   = "Dedi Wahyudi";
+  loadFromSheets();
 
   // Tab interaktif
   document.querySelectorAll(".tab").forEach(t => {
