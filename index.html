@@ -1167,7 +1167,7 @@
 
   function filterJobs(q) {
     const ptFilter = (document.getElementById("jobs-filter-pt")||{}).value || "";
-    filteredJobs = jobs.filter(j => {
+    filteredJobs = [...jobs].reverse().filter(j => {
       const matchQ  = !q || j.jabatan.toLowerCase().includes(q.toLowerCase()) ||
                       j.departemen.toLowerCase().includes(q.toLowerCase()) ||
                       j.bagian.toLowerCase().includes(q.toLowerCase());
@@ -1400,8 +1400,8 @@
         </div>
       </div>`;
 
-    // Init table
-    filteredJobs = jobs;
+    // Init table — urut dari row terbaru (terbalik urutan sheet)
+    filteredJobs = [...jobs].reverse();
     jobsPage = 1;
     renderJobsTable();
 
