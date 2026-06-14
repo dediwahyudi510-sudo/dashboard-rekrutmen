@@ -1529,7 +1529,7 @@
     const totalKebutuhan  = recapJobs.reduce((s,r) => s + (parseInt(r.kebutuhan) ||0), 0);
     const totalTerpenuhi  = recapJobs.reduce((s,r) => s + (parseInt(r.terpenuhi) ||0), 0);
     const totalKekurangan = recapJobs.reduce((s,r) => s + (parseInt(r.kekurangan)||0), 0);
-    const openPosisi      = openJobsCount || jobs.filter(j => j.status === "Open").length;
+    const openPosisi      = recapJobs.length;
 
     document.getElementById("progress-container").innerHTML = `
       <!-- SUMMARY CARDS -->
@@ -1537,7 +1537,7 @@
         <div class="stat-card">
           <div class="stat-header"><span class="stat-label">Open Posisi</span><div class="stat-icon blue">📋</div></div>
           <div class="stat-value">${openPosisi}</div>
-          <div class="stat-footer"><span class="stat-period">lowongan masih open</span></div>
+          <div class="stat-footer"><span class="stat-period">jabatan dibutuhkan</span></div>
         </div>
         <div class="stat-card">
           <div class="stat-header"><span class="stat-label">Kebutuhan</span><div class="stat-icon yellow">🎯</div></div>
