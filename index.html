@@ -671,7 +671,11 @@
     return lines.slice(1).filter(l => l.trim()).map(line => {
       const vals = parseCSVRow(line);
       const obj = {};
-      headers.forEach((h, i) => obj[h.trim()] = (vals[i] || "").replace(/^"|"$/g, ""));
+      headers.forEach((h, i) => {
+        const v = (vals[i] || "").replace(/^"|"$/g, "");
+        obj[h.trim()] = v;
+        obj[`_col${i}`] = v; // fallback akses by posisi kolom
+      });
       return obj;
     });
   }
@@ -745,10 +749,11 @@
       }
 
       candidates = rows.map((r, i) => {
-        const tglRaw = r.tanggal_berkas_diterima || r['tanggal_berkas diterima'] || r.tanggal || "";
+        // coba nama kolom baru, lama, lalu fallback posisi (kolom C = index 2, kolom A = index 0)
+        const tglRaw = r.tanggal_berkas_diterima || r['tanggal_berkas diterima'] || r.tanggal || r._col2 || "";
         const { dateObj, label } = parseTgl(tglRaw);
         return {
-          id:          r.nomor_berkas || r.kode_id || "",
+          id:          r.nomor_berkas || r.kode_id || r._col0 || "",
           name:        r.nama || "",
           email:       r.email || "",
           posisi:      r.posisi || "-",
