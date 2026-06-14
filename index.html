@@ -1697,7 +1697,7 @@
     if (tbody) tbody.innerHTML = filtered.map(f => `
       <tr>
         <td>${f.nama || "-"}</td>
-        <td style="font-size:12px;color:var(--muted)">${f.nomor_berkas || "-"}</td>
+        <td style="font-size:12px;color:var(--muted)">${f.nomor_permintaan || "-"}</td>
         <td><span style="font-weight:600;color:var(--primary)">${f.pt || "-"}</span></td>
         <td>${f.departemen || f.dep || "-"}</td>
         <td>${f.bagian || "-"}</td>
@@ -1735,7 +1735,7 @@
           <thead>
             <tr style="background:var(--sidebar);border-bottom:1px solid var(--border)">
               <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--text)">Nama</th>
-              <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--text)">No. Berkas</th>
+              <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--text)">No. Permintaan</th>
               <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--text)">PT</th>
               <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--text)">Departemen</th>
               <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--text)">Bagian</th>
@@ -1748,7 +1748,7 @@
             ${data.map(f => `
               <tr>
                 <td>${f.nama || "-"}</td>
-                <td style="font-size:12px;color:var(--muted)">${f.nomor_berkas || "-"}</td>
+                <td style="font-size:12px;color:var(--muted)">${f.nomor_permintaan || "-"}</td>
                 <td><span style="font-weight:600;color:var(--primary)">${f.pt || "-"}</span></td>
                 <td>${f.departemen || f.dep || "-"}</td>
                 <td>${f.bagian || "-"}</td>
