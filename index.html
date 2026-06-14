@@ -429,7 +429,7 @@
       <span class="badge-count" id="badge-penempatan">—</span>
     </div>
     <div class="nav-label" style="margin-top:12px">Laporan</div>
-    <div class="nav-item">
+    <div class="nav-item" data-page="analitik" onclick="switchPage('analitik')">
       <span class="icon">📈</span> Analitik
     </div>
     <div class="nav-item">
@@ -636,6 +636,13 @@
   <div class="content" id="page-lowongan" style="display:none">
     <div id="jobs-container">
       <div style="color:var(--muted);font-size:13px;padding:20px 0">⏳ Memuat data lowongan...</div>
+    </div>
+  </div>
+
+  <!-- PAGE: ANALITIK -->
+  <div class="content" id="page-analitik" style="display:none">
+    <div id="analitik-container">
+      <div style="color:var(--muted);font-size:13px;padding:20px 0">⏳ Memuat data analitik...</div>
     </div>
   </div>
 
@@ -1254,18 +1261,19 @@
     const activeNav = document.querySelector(`.nav-item[data-page="${page}"]`);
     if (activeNav) activeNav.classList.add("active");
 
-    ["dashboard","kandidat","lowongan","interview","penempatan"].forEach(p => {
+    ["dashboard","kandidat","lowongan","interview","penempatan","analitik"].forEach(p => {
       const el = document.getElementById(`page-${p}`);
       if (el) el.style.display = p === page ? "block" : "none";
     });
 
-    const titles = { dashboard:"Dashboard Rekrutmen", kandidat:"Data Kandidat", lowongan:"Lowongan Kerja", interview:"Pipeline Interview", penempatan:"Penempatan" };
+    const titles = { dashboard:"Dashboard Rekrutmen", kandidat:"Data Kandidat", lowongan:"Lowongan Kerja", interview:"Pipeline Interview", penempatan:"Penempatan", analitik:"Analitik Rekrutmen" };
     document.getElementById("topbar-title").textContent = titles[page] || page;
 
     if (page === "dashboard") { if (!recapJobs.length) loadRecapJobs(); else renderProgressDashboard(); }
     if (page === "lowongan")  { if (!jobs.length) loadJobs(); else renderJobsPage(); }
     if (page === "interview") { if (!phases.length) loadPhases(); else renderInterviewPage(); }
     if (page === "penempatan") { if (!window._fulfillments) loadPenempatan(); else renderPenempatanPage(); }
+    if (page === "analitik")  { loadAnalitik(); }
   }
 
   // ── JOBS DATA ──────────────────────────────────────────────
@@ -1812,6 +1820,329 @@
           </tbody>
         </table>
       </div>`;
+  }
+
+  // ── ANALITIK ───────────────────────────────────────────────
+  let _analitikCharts = [];
+  async function loadAnalitik() {
+    const container = document.getElementById("analitik-container");
+    container.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:20px 0">⏳ Memuat data dari semua sheet...</div>`;
+    try {
+      const [resJobs, resFulfill, resRecap, resPhase] = await Promise.all([
+        fetch(GVIZ("jobs")),
+        fetch(GVIZ("fulfillment")),
+        fetch(GVIZ("recap_jobs")),
+        fetch(GVIZ("phase")),
+      ]);
+      const aJobs    = parseCSV(await resJobs.text()).filter(r => r.jabatan);
+      const aFulfill = parseCSV(await resFulfill.text()).filter(r => r.nama);
+      const aRecap   = parseCSV(await resRecap.text()).filter(r => r.jabatan);
+      const aPhase   = parseCSV(await resPhase.text()).filter(r => r.nama_kandidat);
+      renderAnalitikPage(aJobs, aFulfill, aRecap, aPhase);
+    } catch(e) {
+      container.innerHTML = `<div style="color:var(--danger)">⚠ Gagal memuat data analitik: ${e.message}</div>`;
+    }
+  }
+
+  function renderAnalitikPage(aJobs, aFulfill, aRecap, aPhase) {
+    _analitikCharts.forEach(c => { try { c.destroy(); } catch(_){} });
+    _analitikCharts = [];
+
+    const cands          = candidates;
+    const totalCands     = cands.length;
+    const openCands      = cands.filter(c => c.status === "open").length;
+    const closeCands     = cands.filter(c => c.status === "close").length;
+    const bekerja        = cands.filter(c => c.status_kandidat === "Sudah Bekerja").length;
+    const openPct        = totalCands ? Math.round(openCands/totalCands*100) : 0;
+
+    const totalJobs      = aJobs.length;
+    const totalKebutuhan = aJobs.reduce((s,r) => s+(parseInt(r.kebutuhan)||0),0);
+    const totalFulfill   = aJobs.reduce((s,r) => s+(parseInt(r.fulfillment)||0),0);
+    const totalOutstand  = aJobs.reduce((s,r) => s+(parseInt(r.outstanding)||0),0);
+    const openJobs       = aJobs.filter(r => (r.cek_status||"").toLowerCase()==="open").length;
+    const fulfillRate    = totalKebutuhan ? Math.round(totalFulfill/totalKebutuhan*100) : 0;
+
+    const totalPlaced    = aFulfill.length;
+
+    const PHASE_ORDER_A  = ['Candidate','Invited','Tested','User Interview','Passed','Hired'];
+    const phaseCounts    = {};
+    PHASE_ORDER_A.forEach(p => phaseCounts[p] = 0);
+    aPhase.forEach(p => { const ph=(p.Phase||p.phase||"Candidate").trim(); if(phaseCounts[ph]!==undefined) phaseCounts[ph]++; });
+    const totalPipeline  = aPhase.length;
+    const hired          = phaseCounts["Hired"]||0;
+    const convRate       = totalPipeline ? Math.round(hired/totalPipeline*100) : 0;
+
+    // Per dept kandidat
+    const candDeptMap = {};
+    cands.forEach(c => { const d=c.dept||"Lainnya"; candDeptMap[d]=(candDeptMap[d]||0)+1; });
+    const topCandDept = Object.entries(candDeptMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+    // Per dept jobs
+    const jobDeptMap = {};
+    aJobs.forEach(j => {
+      const d=j.departemen||"Lainnya";
+      if(!jobDeptMap[d]) jobDeptMap[d]={kebutuhan:0,fulfillment:0,outstanding:0};
+      jobDeptMap[d].kebutuhan  += parseInt(j.kebutuhan)||0;
+      jobDeptMap[d].fulfillment+= parseInt(j.fulfillment)||0;
+      jobDeptMap[d].outstanding+= parseInt(j.outstanding)||0;
+    });
+    const jobDepts = Object.entries(jobDeptMap).sort((a,b)=>b[1].kebutuhan-a[1].kebutuhan).slice(0,8);
+
+    // Per PT
+    const ptMap = {};
+    aJobs.forEach(j => { const p=j.pt||"Lain"; ptMap[p]=(ptMap[p]||0)+(parseInt(j.kebutuhan)||0); });
+
+    // Recap per dept
+    const recapDeptMap = {};
+    aRecap.forEach(r => {
+      const d=r.departemen||"Lainnya";
+      if(!recapDeptMap[d]) recapDeptMap[d]={kebutuhan:0,terpenuhi:0};
+      recapDeptMap[d].kebutuhan += parseInt(r.kebutuhan)||0;
+      recapDeptMap[d].terpenuhi += parseInt(r.terpenuhi)||0;
+    });
+    const recapDepts = Object.entries(recapDeptMap).sort((a,b)=>b[1].kebutuhan-a[1].kebutuhan);
+
+    // Fulfillment per bulan
+    const bulanMap = {};
+    aFulfill.forEach(f => {
+      const raw = f["tgl-gabung"]||f.tgl_gabung||"";
+      const {dateObj} = parseTgl(raw);
+      if(dateObj) {
+        const key=`${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,"0")}`;
+        bulanMap[key]=(bulanMap[key]||0)+1;
+      }
+    });
+    const bulanSorted = Object.entries(bulanMap).sort((a,b)=>a[0].localeCompare(b[0])).slice(-12);
+    const bulanLabels = bulanSorted.map(([k])=>{
+      const [y,m]=k.split("-");
+      return new Date(+y,+m-1,1).toLocaleDateString("id-ID",{month:"short",year:"2-digit"});
+    });
+    const bulanVals = bulanSorted.map(([,v])=>v);
+
+    // Insights
+    const insights = [];
+    const iC={danger:"#FEF2F2",warning:"#FFFBEB",success:"#F0FDF4",info:"#EFF6FF"};
+    const iB={danger:"#FECACA",warning:"#FDE68A",success:"#BBF7D0",info:"#BFDBFE"};
+    const iT={danger:"#991B1B",warning:"#92400E",success:"#065F46",info:"#1E40AF"};
+    if(fulfillRate<50)  insights.push({t:"danger", i:"⚠️", text:`Fulfillment rate hanya <strong>${fulfillRate}%</strong> — masih ada <strong>${totalOutstand}</strong> posisi belum terpenuhi.`});
+    else if(fulfillRate>=80) insights.push({t:"success",i:"✅",text:`Fulfillment rate <strong>${fulfillRate}%</strong> — pencapaian sangat baik!`});
+    else insights.push({t:"warning",i:"📊",text:`Fulfillment rate <strong>${fulfillRate}%</strong> — masih ada ruang untuk ditingkatkan.`});
+    if(convRate<20) insights.push({t:"warning",i:"🔄",text:`Conversion rate pipeline hanya <strong>${convRate}%</strong> — perlu evaluasi proses seleksi.`});
+    else insights.push({t:"success",i:"🎯",text:`Conversion rate pipeline <strong>${convRate}%</strong> dari ${totalPipeline} kandidat.`});
+    if(topCandDept[0]) insights.push({t:"info",i:"🏆",text:`Departemen dengan kandidat terbanyak: <strong>${topCandDept[0][0]}</strong> (${topCandDept[0][1]} kandidat).`});
+    if(openPct>60) insights.push({t:"warning",i:"⏳",text:`<strong>${openPct}%</strong> kandidat masih Open — pipeline butuh percepatan.`});
+
+    document.getElementById("analitik-container").innerHTML = `
+    <style>
+      .an-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+      .an-kpi{background:#fff;border-radius:14px;border:1px solid var(--border);padding:20px}
+      .an-kpi-lbl{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+      .an-kpi-val{font-size:36px;font-weight:800;line-height:1;color:var(--dark)}
+      .an-kpi-sub{font-size:12px;color:var(--muted);margin-top:6px}
+      .an-kpi-bar{height:5px;background:#E2E8F0;border-radius:3px;margin-top:10px}
+      .an-kpi-fill{height:100%;border-radius:3px}
+      .an-section{background:#fff;border-radius:14px;border:1px solid var(--border);padding:22px;margin-bottom:20px}
+      .an-section-title{font-size:15px;font-weight:700;color:var(--dark);margin-bottom:2px}
+      .an-section-sub{font-size:12px;color:var(--muted);margin-bottom:18px}
+      .an-charts-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+      .an-funnel{display:flex;border-radius:12px;overflow:hidden;margin-bottom:4px}
+      .an-funnel-item{flex:1;padding:16px 8px;text-align:center}
+      .an-funnel-num{font-size:22px;font-weight:800;color:#fff;line-height:1}
+      .an-funnel-lbl{font-size:10px;font-weight:600;color:rgba(255,255,255,.85);margin-top:4px}
+      .an-funnel-pct{font-size:11px;color:rgba(255,255,255,.7);margin-top:2px}
+      .an-rate-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+      .an-rate-label{width:150px;font-size:12px;font-weight:600;color:var(--dark);flex-shrink:0}
+      .an-rate-bar{flex:1;height:10px;background:#E2E8F0;border-radius:5px;overflow:hidden}
+      .an-rate-fill{height:100%;border-radius:5px}
+      .an-rate-val{width:40px;text-align:right;font-size:12px;font-weight:700}
+    </style>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <h2 style="font-size:20px;font-weight:800;color:var(--dark)">Analitik Rekrutmen</h2>
+        <p style="font-size:13px;color:var(--muted);margin-top:2px">Ringkasan dari semua sheet · data live Google Sheets</p>
+      </div>
+      <button onclick="loadAnalitik()" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--dark);cursor:pointer;font-size:13px;font-weight:600">🔄 Refresh</button>
+    </div>
+
+    <!-- KPI ROW 1 -->
+    <div class="an-kpi-grid">
+      <div class="an-kpi">
+        <div class="an-kpi-lbl">Total Kandidat</div>
+        <div class="an-kpi-val" style="color:#4F46E5">${totalCands.toLocaleString()}</div>
+        <div class="an-kpi-sub">Open: ${openCands} &nbsp;|&nbsp; Close: ${closeCands}</div>
+        <div class="an-kpi-bar"><div class="an-kpi-fill" style="width:${openPct}%;background:#4F46E5"></div></div>
+      </div>
+      <div class="an-kpi">
+        <div class="an-kpi-lbl">Total Lowongan</div>
+        <div class="an-kpi-val" style="color:#0EA5E9">${totalJobs}</div>
+        <div class="an-kpi-sub">Open: ${openJobs} posisi aktif</div>
+        <div class="an-kpi-bar"><div class="an-kpi-fill" style="width:${totalJobs?Math.round(openJobs/totalJobs*100):0}%;background:#0EA5E9"></div></div>
+      </div>
+      <div class="an-kpi">
+        <div class="an-kpi-lbl">Pipeline Interview</div>
+        <div class="an-kpi-val" style="color:#8B5CF6">${totalPipeline}</div>
+        <div class="an-kpi-sub">Hired: ${hired} &nbsp;|&nbsp; Konversi: ${convRate}%</div>
+        <div class="an-kpi-bar"><div class="an-kpi-fill" style="width:${convRate}%;background:#8B5CF6"></div></div>
+      </div>
+      <div class="an-kpi">
+        <div class="an-kpi-lbl">Total Penempatan</div>
+        <div class="an-kpi-val" style="color:#10B981">${totalPlaced}</div>
+        <div class="an-kpi-sub">Karyawan berhasil ditempatkan</div>
+        <div class="an-kpi-bar"><div class="an-kpi-fill" style="width:100%;background:#10B981"></div></div>
+      </div>
+    </div>
+
+    <!-- KPI ROW 2 -->
+    <div class="an-kpi-grid">
+      <div class="an-kpi">
+        <div class="an-kpi-lbl">Total Kebutuhan</div>
+        <div class="an-kpi-val">${totalKebutuhan}</div>
+        <div class="an-kpi-sub">dari sheet jobs</div>
+      </div>
+      <div class="an-kpi">
+        <div class="an-kpi-lbl">Terpenuhi</div>
+        <div class="an-kpi-val" style="color:#10B981">${totalFulfill}</div>
+        <div class="an-kpi-sub">${fulfillRate}% dari total kebutuhan</div>
+        <div class="an-kpi-bar"><div class="an-kpi-fill" style="width:${fulfillRate}%;background:#10B981"></div></div>
+      </div>
+      <div class="an-kpi">
+        <div class="an-kpi-lbl">Outstanding</div>
+        <div class="an-kpi-val" style="color:#EF4444">${totalOutstand}</div>
+        <div class="an-kpi-sub">posisi belum terpenuhi</div>
+        <div class="an-kpi-bar"><div class="an-kpi-fill" style="width:${totalKebutuhan?Math.round(totalOutstand/totalKebutuhan*100):0}%;background:#EF4444"></div></div>
+      </div>
+      <div class="an-kpi">
+        <div class="an-kpi-lbl">Sudah Bekerja</div>
+        <div class="an-kpi-val" style="color:#F59E0B">${bekerja}</div>
+        <div class="an-kpi-sub">${totalCands?Math.round(bekerja/totalCands*100):0}% dari total kandidat</div>
+        <div class="an-kpi-bar"><div class="an-kpi-fill" style="width:${totalCands?Math.round(bekerja/totalCands*100):0}%;background:#F59E0B"></div></div>
+      </div>
+    </div>
+
+    <!-- INSIGHTS -->
+    <div class="an-section">
+      <div class="an-section-title">💡 Insight Otomatis</div>
+      <div class="an-section-sub">Analisa berdasarkan data terkini dari semua sheet</div>
+      ${insights.map(i=>`
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:10px;margin-bottom:10px;font-size:13px;background:${iC[i.t]};border:1px solid ${iB[i.t]};color:${iT[i.t]}">
+          <span style="font-size:18px;flex-shrink:0">${i.i}</span><span>${i.text}</span>
+        </div>`).join("")}
+    </div>
+
+    <!-- FUNNEL -->
+    <div class="an-section">
+      <div class="an-section-title">🔄 Funnel Pipeline Interview</div>
+      <div class="an-section-sub">Alur kandidat dari seleksi awal hingga hired</div>
+      <div class="an-funnel">
+        ${[
+          {ph:"Candidate",color:"#64748B",label:"Kandidat"},
+          {ph:"Invited",color:"#0EA5E9",label:"Diundang"},
+          {ph:"Tested",color:"#F59E0B",label:"Test"},
+          {ph:"User Interview",color:"#4F46E5",label:"Interview"},
+          {ph:"Passed",color:"#8B5CF6",label:"Lulus"},
+          {ph:"Hired",color:"#10B981",label:"Hired"},
+        ].map(({ph,color,label})=>{
+          const n=phaseCounts[ph]||0;
+          const p=totalPipeline?Math.round(n/totalPipeline*100):0;
+          return `<div class="an-funnel-item" style="background:${color}">
+            <div class="an-funnel-num">${n}</div>
+            <div class="an-funnel-lbl">${label}</div>
+            <div class="an-funnel-pct">${p}%</div>
+          </div>`;
+        }).join('<div style="width:2px;background:rgba(255,255,255,.2)"></div>')}
+      </div>
+    </div>
+
+    <!-- CHARTS ROW 1 -->
+    <div class="an-charts-2">
+      <div class="an-section" style="margin-bottom:0">
+        <div class="an-section-title">👥 Kandidat per Departemen</div>
+        <div class="an-section-sub">Top 8 departemen</div>
+        <canvas id="an-c1" height="200"></canvas>
+      </div>
+      <div class="an-section" style="margin-bottom:0">
+        <div class="an-section-title">📊 Distribusi Status Kandidat</div>
+        <div class="an-section-sub">Open vs Close vs Sudah Bekerja</div>
+        <canvas id="an-c2" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- CHARTS ROW 2 -->
+    <div class="an-charts-2" style="margin-top:0">
+      <div class="an-section" style="margin-bottom:0">
+        <div class="an-section-title">🎯 Kebutuhan vs Terpenuhi per Departemen</div>
+        <div class="an-section-sub">Dari sheet jobs</div>
+        <canvas id="an-c3" height="200"></canvas>
+      </div>
+      <div class="an-section" style="margin-bottom:0">
+        <div class="an-section-title">🏢 Distribusi Kebutuhan per PT</div>
+        <div class="an-section-sub">Berdasarkan total kebutuhan karyawan</div>
+        <canvas id="an-c4" height="200"></canvas>
+      </div>
+    </div>
+
+    ${bulanLabels.length ? `
+    <div class="an-section" style="margin-top:20px">
+      <div class="an-section-title">📅 Tren Penempatan per Bulan</div>
+      <div class="an-section-sub">Jumlah karyawan ditempatkan (12 bulan terakhir)</div>
+      <canvas id="an-c5" height="90"></canvas>
+    </div>` : ""}
+
+    ${recapDepts.length ? `
+    <div class="an-section" style="margin-top:20px">
+      <div class="an-section-title">📈 Fulfillment Rate per Departemen</div>
+      <div class="an-section-sub">Persentase terpenuhi dari total kebutuhan (rekap_jobs)</div>
+      <div style="margin-top:12px">
+        ${recapDepts.map(([dept,d])=>{
+          const rate=d.kebutuhan?Math.round(d.terpenuhi/d.kebutuhan*100):0;
+          const col=rate>=80?"#10B981":rate>=50?"#F59E0B":"#EF4444";
+          return `<div class="an-rate-row">
+            <div class="an-rate-label" title="${dept}">${dept.length>20?dept.slice(0,18)+"…":dept}</div>
+            <div class="an-rate-bar"><div class="an-rate-fill" style="width:${rate}%;background:${col}"></div></div>
+            <div class="an-rate-val" style="color:${col}">${rate}%</div>
+            <div style="font-size:11px;color:var(--muted);min-width:90px">${d.terpenuhi}/${d.kebutuhan}</div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>` : ""}
+    `;
+
+    setTimeout(()=>{
+      const COLORS = ["#4F46E5","#0EA5E9","#10B981","#F59E0B","#8B5CF6","#EF4444","#EC4899","#14B8A6"];
+      const opts   = {responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:"#F1F5F9"}}}};
+
+      const c1=document.getElementById("an-c1");
+      if(c1) _analitikCharts.push(new Chart(c1,{type:"bar",
+        data:{labels:topCandDept.map(d=>d[0]),datasets:[{label:"Kandidat",data:topCandDept.map(d=>d[1]),backgroundColor:COLORS,borderRadius:6}]},
+        options:opts}));
+
+      const c2=document.getElementById("an-c2");
+      if(c2) _analitikCharts.push(new Chart(c2,{type:"doughnut",
+        data:{labels:["Open","Close","Sudah Bekerja","Lainnya"],
+          datasets:[{data:[openCands,closeCands,bekerja,Math.max(0,totalCands-openCands-closeCands-bekerja)],
+            backgroundColor:["#4F46E5","#10B981","#F59E0B","#E2E8F0"],borderWidth:0,hoverOffset:4}]},
+        options:{responsive:true,cutout:"65%",plugins:{legend:{position:"right",labels:{boxWidth:12,font:{size:12},padding:14}}}}}));
+
+      const c3=document.getElementById("an-c3");
+      if(c3) _analitikCharts.push(new Chart(c3,{type:"bar",
+        data:{labels:jobDepts.map(d=>d[0]),datasets:[
+          {label:"Kebutuhan",data:jobDepts.map(d=>d[1].kebutuhan),backgroundColor:"#4F46E5",borderRadius:4},
+          {label:"Terpenuhi",data:jobDepts.map(d=>d[1].fulfillment),backgroundColor:"#10B981",borderRadius:4},
+          {label:"Outstanding",data:jobDepts.map(d=>d[1].outstanding),backgroundColor:"#F59E0B",borderRadius:4},
+        ]},
+        options:{responsive:true,plugins:{legend:{position:"top",labels:{font:{size:11}}}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:"#F1F5F9"}}}}}));
+
+      const c4=document.getElementById("an-c4");
+      if(c4) _analitikCharts.push(new Chart(c4,{type:"pie",
+        data:{labels:Object.keys(ptMap),datasets:[{data:Object.values(ptMap),backgroundColor:COLORS,borderWidth:0,hoverOffset:4}]},
+        options:{responsive:true,plugins:{legend:{position:"right",labels:{boxWidth:12,font:{size:12},padding:14}}}}}));
+
+      const c5=document.getElementById("an-c5");
+      if(c5&&bulanLabels.length) _analitikCharts.push(new Chart(c5,{type:"bar",
+        data:{labels:bulanLabels,datasets:[{label:"Penempatan",data:bulanVals,backgroundColor:"#10B981",borderRadius:6}]},
+        options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:"#F1F5F9"},ticks:{stepSize:1}}}}}));
+    }, 100);
   }
 </script>
 
