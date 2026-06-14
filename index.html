@@ -1162,13 +1162,15 @@
   window.phaseSearch = phaseSearch;
 
   function filterJobs(q) {
-    const ptFilter = (document.getElementById("jobs-filter-pt")||{}).value || "";
+    const ptFilter     = (document.getElementById("jobs-filter-pt")||{}).value || "";
+    const statusFilter = (document.getElementById("jobs-filter-status")||{}).value || "";
     filteredJobs = jobs.filter(j => {
-      const matchQ  = !q || j.jabatan.toLowerCase().includes(q.toLowerCase()) ||
-                      j.departemen.toLowerCase().includes(q.toLowerCase()) ||
-                      j.bagian.toLowerCase().includes(q.toLowerCase());
-      const matchPT = !ptFilter || j.pt === ptFilter;
-      return matchQ && matchPT;
+      const matchQ      = !q || j.jabatan.toLowerCase().includes(q.toLowerCase()) ||
+                          j.departemen.toLowerCase().includes(q.toLowerCase()) ||
+                          j.bagian.toLowerCase().includes(q.toLowerCase());
+      const matchPT     = !ptFilter || j.pt === ptFilter;
+      const matchStatus = !statusFilter || j.status.toLowerCase() === statusFilter.toLowerCase();
+      return matchQ && matchPT && matchStatus;
     }).sort((a,b) => {
       if (a.tglDateObj && b.tglDateObj) return b.tglDateObj - a.tglDateObj;
       if (a.tglDateObj) return -1;
@@ -1390,6 +1392,12 @@
               style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--dark);background:var(--bg);cursor:pointer">
               <option value="">Semua PT</option>
               ${[...new Set(jobs.map(j=>j.pt).filter(Boolean))].map(pt=>`<option value="${pt}">${pt}</option>`).join("")}
+            </select>
+            <select id="jobs-filter-status" onchange="filterJobs(document.getElementById('jobs-search').value)"
+              style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--dark);background:var(--bg);cursor:pointer">
+              <option value="">Semua Status</option>
+              <option value="Open">Open</option>
+              <option value="Closed">Closed</option>
             </select>
           </div>
         </div>
